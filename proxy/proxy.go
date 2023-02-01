@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/arbor-dev/arbor/proxy/middleware"
 )
@@ -31,10 +32,25 @@ func PATCH(w http.ResponseWriter, r *http.Request, url string, format string, to
 	ProxyRequest(w, r, url, format, token)
 }
 
-func ProxyWebsocket(w http.ResponseWriter, r *http.Request, url string, format string, token string) {
+func ProxyWebsocket(w http.ResponseWriter, r *http.Request, url_str string, format string, token string) {
 	middlewares := ProxyMiddlewaresFactory(format, token)
 
-	ProxyWebsocketWithMiddlewares(w, r, url, middlewares)
+	// URI guard to ensure that only WS URIs are passed
+	parsed_url, err := url.Parse(url_str)
+	if err != nil {
+		w.WriteHeader(http.StatusBadGateway)
+		return
+	}
+
+	switch parsed_url.Scheme {
+	case "http":
+		parsed_url.Scheme = "ws"
+	case "https":
+		parsed_url.Scheme = "wss"
+	}
+
+	corrected_url := parsed_url.String()
+	ProxyWebsocketWithMiddlewares(w, r, corrected_url, middlewares)
 }
 
 // ProxyRequest proxies the caller's request based on the url, format, and token
